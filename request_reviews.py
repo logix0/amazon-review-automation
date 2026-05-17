@@ -18,19 +18,35 @@ def get_access_token():
     r.raise_for_status()
     return r.json()["access_token"]
 
-def get_orders(token):
+def get_all_orders(token):
     start = (datetime.now(timezone.utc) - timedelta(days=35)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    r = requests.get(
-        "https://sellingpartnerapi-na.amazon.com/orders/v0/orders",
-        headers={"x-amz-access-token": token},
-        params={
+    all_orders = []
+    next_token = None
+
+    while True:
+        params = {
             "MarketplaceIds": MARKETPLACE_ID,
             "CreatedAfter": start,
             "OrderStatuses": "Shipped",
         }
-    )
-    r.raise_for_status()
-    return r.json().get("payload", {}).get("Orders", [])
+        if next_token:
+            params = {"MarketplaceIds": MARKETPLACE_ID, "NextToken": next_token}
+
+        r = requests.get(
+            "https://sellingpartnerapi-na.amazon.com/orders/v0/orders",
+            headers={"x-amz-access-token": token},
+            params=params
+        )
+        r.raise_for_status()
+        payload = r.json().get("payload", {})
+        all_orders.extend(payload.get("Orders", []))
+
+        next_token = payload.get("NextToken")
+        if not next_token:
+            break
+
+    print(f"Total orders found: {len(all_orders)}")
+    return all_orders
 
 def get_delivery_date(token, order_id):
     r = requests.get(
@@ -65,37 +81,42 @@ def request_review(token, order_id):
 
 def main():
     token = get_access_token()
-    orders = get_orders(token)
+    orders = get_all_orders(token)
     now = datetime.now(timezone.utc)
+
+    success = 0
+    skipped_log = 0
+    skipped_window = 0
+    failed = 0
 
     for order in orders:
         order_id = order["AmazonOrderId"]
 
         if already_requested(order_id):
-            print(f"SKIP (already requested): {order_id}")
+            skipped_log += 1
             continue
 
         delivery_date = get_delivery_date(token, order_id)
         if not delivery_date:
-            print(f"SKIP (no delivery date): {order_id}")
+            print(f"SKIP (no date): {order_id}")
             continue
 
         days_since = (now - delivery_date).days
 
-        if days_since < 5:
-            print(f"SKIP (too soon, {days_since} days): {order_id}")
-            continue
-
-        if days_since > 30:
-            print(f"SKIP (too late, {days_since} days): {order_id}")
+        if days_since < 5 or days_since > 30:
+            skipped_window += 1
             continue
 
         status = request_review(token, order_id)
         if status == 201:
-            print(f"SUCCESS: {order_id}")
+            print(f"SUCCESS: {order_id} ({days_since} days since delivery)")
             log_requested(order_id)
+            success += 1
         else:
             print(f"FAILED ({status}): {order_id}")
+            failed += 1
+
+    print(f"\nDone — Sent: {success} | Already logged: {skipped_log} | Outside window: {skipped_window} | Failed: {failed}")
 
 if __name__ == "__main__":
     main()
