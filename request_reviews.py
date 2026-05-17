@@ -27,7 +27,6 @@ def get_all_orders(token):
         params = {
             "MarketplaceIds": MARKETPLACE_ID,
             "CreatedAfter": start,
-            "OrderStatuses": "Shipped",
         }
         if next_token:
             params = {"MarketplaceIds": MARKETPLACE_ID, "NextToken": next_token}
@@ -37,6 +36,10 @@ def get_all_orders(token):
             headers={"x-amz-access-token": token},
             params=params
         )
+        
+        print(f"Status code: {r.status_code}")
+        print(f"Response: {r.text[:500]}")
+        
         r.raise_for_status()
         payload = r.json().get("payload", {})
         all_orders.extend(payload.get("Orders", []))
