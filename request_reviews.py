@@ -19,16 +19,14 @@ def get_access_token():
     return r.json()["access_token"]
 
 def get_all_orders(token):
-    start = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    end = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
     all_orders = []
     next_token = None
 
     while True:
         params = {
             "MarketplaceIds": MARKETPLACE_ID,
-            "LastUpdatedAfter": start,
-            "LastUpdatedBefore": end,
+            "CreatedAfter": start,
         }
         if next_token:
             params = {"MarketplaceIds": MARKETPLACE_ID, "NextToken": next_token}
@@ -40,7 +38,7 @@ def get_all_orders(token):
         )
         
         print(f"Status code: {r.status_code}")
-        print(f"Response: {r.text[:500]}")
+        print(f"Response: {r.text[:1000]}")
         
         r.raise_for_status()
         payload = r.json().get("payload", {})
