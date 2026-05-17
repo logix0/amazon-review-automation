@@ -24,17 +24,14 @@ def get_all_orders(token):
     next_token = None
 
     while True:
-        params = {
-            "MarketplaceIds": MARKETPLACE_ID,
-            "CreatedAfter": start,
-        }
         if next_token:
-            params = {"MarketplaceIds": MARKETPLACE_ID, "NextToken": next_token}
+            url = f"https://sellingpartnerapi-na.amazon.com/orders/v0/orders?MarketplaceIds={MARKETPLACE_ID}&NextToken={next_token}"
+        else:
+            url = f"https://sellingpartnerapi-na.amazon.com/orders/v0/orders?MarketplaceIds={MARKETPLACE_ID}&CreatedAfter={start}"
 
         r = requests.get(
-            "https://sellingpartnerapi-na.amazon.com/orders/v0/orders",
+            url,
             headers={"x-amz-access-token": token},
-            params=params
         )
         
         print(f"Status code: {r.status_code}")
